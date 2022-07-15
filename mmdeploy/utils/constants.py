@@ -58,6 +58,7 @@ class Backend(AdvancedEnum):
     OPENVINO = 'openvino'
     SDK = 'sdk'
     TORCHSCRIPT = 'torchscript'
+    CANN = 'cann'
     DEFAULT = 'default'
 
 
