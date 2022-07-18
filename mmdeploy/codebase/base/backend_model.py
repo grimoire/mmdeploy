@@ -106,6 +106,12 @@ class BaseBackendModel(torch.nn.Module, metaclass=ABCMeta):
                 model=backend_files[0],
                 input_names=input_names,
                 output_names=output_names)
+        elif backend == Backend.CANN:
+            from mmdeploy.backend.cann import CANNWrapper
+            return CANNWrapper(
+                model=backend_files[0],
+                device=device,
+                output_names=output_names)
         else:
             raise NotImplementedError(f'Unknown backend type: {backend.value}')
 

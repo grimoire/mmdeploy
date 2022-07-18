@@ -317,21 +317,50 @@ def main():
                 input_shapes=input_shapes)
             pplnn_files += [onnx_path, algo_file]
         backend_files = pplnn_files
+    elif backend == Backend.CANN:
+        from mmdeploy.apis.cann import is_available as is_available_cann
+        assert is_available_cann(), \
+            'CANN is not available, please check the environment first.'
 
+        from mmdeploy.apis.cann import from_onnx, get_atc_options_from_cfg
+        cann_pipeline_funcs = [from_onnx]
+        PIPELINE_MANAGER.set_log_level(log_level, cann_pipeline_funcs)
+        backend_files = []
+        for index, onnx_path in enumerate(ir_files):
+            output_prefix = osp.splitext(onnx_path)[0]
+            opts = get_atc_options_from_cfg(deploy_cfg, index)
+            from_onnx(onnx_path, output_prefix, **opts)
+            backend_files.append(output_prefix + '.om')
     if args.test_img is None:
         args.test_img = args.img
 
     headless = False
     # check headless or not for all platforms.
-    import tkinter
     try:
+        import tkinter
         tkinter.Tk()
     except Exception:
         headless = True
 
     # for headless installation.
-    if not headless:
-        # visualize model of the backend
+    if headless:
+        args.show = False
+        logger.warning('Show visualize result has been skipped '
+                       ' because it\'s running on a headless device.')
+
+    # visualize model of the backend
+    if backend == Backend.CANN:
+        # Can not use cann in multiprocess.
+        visualize_model(
+            model_cfg_path,
+            deploy_cfg_path,
+            backend_files,
+            args.test_img,
+            'npu:0',
+            backend=backend,
+            output_file=osp.join(args.work_dir, f'output_{backend.value}.jpg'),
+            show_result=args.show)
+    else:
         create_process(
             f'visualize {backend.value} model',
             target=visualize_model,
@@ -344,21 +373,18 @@ def main():
                 show_result=args.show),
             ret_value=ret_value)
 
-        # visualize pytorch model
-        create_process(
-            'visualize pytorch model',
-            target=visualize_model,
-            args=(model_cfg_path, deploy_cfg_path, [checkpoint_path],
-                  args.test_img, args.device),
-            kwargs=dict(
-                backend=Backend.PYTORCH,
-                output_file=osp.join(args.work_dir, 'output_pytorch.jpg'),
-                show_result=args.show),
-            ret_value=ret_value)
-    else:
-        logger.warning(
-            '\"visualize_model\" has been skipped may be because it\'s \
-            running on a headless device.')
+    # visualize pytorch model
+    create_process(
+        'visualize pytorch model',
+        target=visualize_model,
+        args=(model_cfg_path, deploy_cfg_path, [checkpoint_path],
+              args.test_img, args.device),
+        kwargs=dict(
+            backend=Backend.PYTORCH,
+            output_file=osp.join(args.work_dir, 'output_pytorch.jpg'),
+            show_result=args.show),
+        ret_value=ret_value)
+
     logger.info('All process success.')
 
 

@@ -131,7 +131,7 @@ class Classification(BaseTask):
         data = test_pipeline(data)
         data = collate([data], samples_per_gpu=1)
         data['img'] = [data['img']]
-        if self.device != 'cpu':
+        if self.device.startswith('cuda'):
             data = scatter(data, [self.device])[0]
         return data, data['img']
 

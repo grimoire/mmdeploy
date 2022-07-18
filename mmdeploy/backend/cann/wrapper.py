@@ -4,7 +4,6 @@ from typing import Dict, Optional, Sequence, Union
 import acl
 import torch
 import torch_npu
-from torch_npu.npu import Stream
 
 from mmdeploy.utils import Backend, get_root_logger
 from mmdeploy.utils.timer import TimeCounter
@@ -37,10 +36,13 @@ class CANNWrapper(BaseWrapper):
     def __init__(self,
                  model: str,
                  output_names: Optional[Sequence[str]] = None,
-                 device_id: int = 0):
+                 device: str = 'npu'):
         super().__init__(output_names)
-        self._device_id = device_id
-        with torch_npu.npu.device(device_id):
+        device = torch.device(device)
+        assert device.type == 'npu', \
+            f'Expect device type npu, but get {device.type}.'
+        self._device_id = device.index if device.index is not None else 0
+        with torch_npu.npu.device(self._device_id):
             self.output_names = output_names
 
             logger.debug(f'Load CANN model from {model}.')
@@ -61,7 +63,8 @@ class CANNWrapper(BaseWrapper):
                 buffer_size = acl.mdl.get_input_size_by_index(model_desc, i)
                 buffer = torch.empty([buffer_size // 4],
                                      dtype=torch.float32,
-                                     device=torch.device(f'npu:{device_id}'))
+                                     device=torch.device(
+                                         'npu', self._device_id))
                 data = acl.create_data_buffer(buffer.data_ptr(), buffer_size)
                 _, ret = acl.mdl.add_dataset_buffer(_input_dataset, data)
                 _input_datas[name] = buffer
@@ -77,7 +80,8 @@ class CANNWrapper(BaseWrapper):
                 buffer_size = acl.mdl.get_output_size_by_index(model_desc, i)
                 buffer = torch.empty([buffer_size // 4],
                                      dtype=torch.float32,
-                                     device=torch.device(f'npu:{device_id}'))
+                                     device=torch.device(
+                                         'npu', self._device_id))
                 data = acl.create_data_buffer(buffer.data_ptr(), buffer_size)
                 _, ret = acl.mdl.add_dataset_buffer(_output_dataset, data)
                 _output_datas[name] = buffer
@@ -89,8 +93,10 @@ class CANNWrapper(BaseWrapper):
 
     def _set_input(self, name: str, val: torch.Tensor):
         """set input value."""
-        assert val.device.type == 'npu', \
-            f'Expect tensor:{name} dtype npu, but get {val.device.type}.'
+        if val.device.type != 'npu':
+            logger.warning(
+                f'Expect tensor:{name} device npu, but get {val.device.type}.')
+            val = val.to(torch.device('npu', self._device_id))
         assert val.device.index == self._device_id, \
             f'Expect tensor:{name} device id {self._device_id},'\
             f' but get {val.device.index}.'
@@ -190,7 +196,7 @@ class CANNWrapper(BaseWrapper):
             device=torch.device(f'npu:{self._device_id}'))
 
         output = {}
-        with torch_npu.npu.stream(stream):
+        with torch.npu.stream(stream):
             # set inputs
             for name, val in inputs.items():
                 self._set_input(name, val)
@@ -207,14 +213,13 @@ class CANNWrapper(BaseWrapper):
 
             # get outputs
             for name in self._output_datas:
-                output[name] = self._get_output(name)
+                new_name = name.split(':')[-1]
+                output[new_name] = self._get_output(name)
 
-        if self.output_names is not None:
-            return [output[name] for name in self.output_names]
         return output
 
     @TimeCounter.count_time()
-    def __acl_execute(self, stream: Stream) -> int:
+    def __acl_execute(self, stream) -> int:
         """Run inference with CANN.
 
         Args:
