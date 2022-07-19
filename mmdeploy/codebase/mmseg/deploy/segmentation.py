@@ -133,7 +133,7 @@ class Segmentation(BaseTask):
             img_metas.data[0] for img_metas in data['img_metas']
         ]
         data['img'] = [img.data[0][None, :] for img in data['img']]
-        if self.device != 'cpu':
+        if self.device.startswith('cuda'):
             data = scatter(data, [self.device])[0]
 
         return data, data['img']
