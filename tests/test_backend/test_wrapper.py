@@ -103,6 +103,12 @@ def onnx2backend(backend, onnx_file):
         work_dir = backend_dir
         from_onnx(onnx_file, work_dir, input_info, output_names)
         return backend_file
+    elif backend == Backend.CANN:
+        from mmdeploy.apis.cann import from_onnx
+        om_file = tempfile.NamedTemporaryFile(suffix='.om').name
+        prefix = om_file[:-3]
+        from_onnx(onnx_file, prefix, input_shapes=dict(input=[1, 3, 8, 8]))
+        return om_file
 
 
 def create_wrapper(backend, model_files):
@@ -133,6 +139,10 @@ def create_wrapper(backend, model_files):
         torchscript_model = TorchscriptWrapper(
             model_files, input_names=input_names, output_names=output_names)
         return torchscript_model
+    elif backend == Backend.CANN:
+        from mmdeploy.backend.cann import CANNWrapper
+        cann_model = CANNWrapper(model_files)
+        return cann_model
     else:
         raise NotImplementedError(f'Unknown backend type: {backend.value}')
 
@@ -163,17 +173,22 @@ def run_wrapper(backend, wrapper, input):
     elif backend == Backend.TORCHSCRIPT:
         results = wrapper({'input': input})['output']
         return results
+    elif backend == Backend.CANN:
+        input = input.to('npu')
+        results = wrapper({'input': input})['output']
+        return results
     else:
         raise NotImplementedError(f'Unknown backend type: {backend.value}')
 
 
 ALL_BACKEND = [
     Backend.TENSORRT, Backend.ONNXRUNTIME, Backend.PPLNN, Backend.NCNN,
-    Backend.OPENVINO, Backend.TORCHSCRIPT
+    Backend.OPENVINO, Backend.TORCHSCRIPT, Backend.CANN
 ]
 
 
-@pytest.mark.parametrize('backend', ALL_BACKEND)
+# @pytest.mark.parametrize('backend', ALL_BACKEND)
+@pytest.mark.parametrize('backend', [Backend.CANN])
 def test_wrapper(backend):
     check_backend(backend, True)
     if backend == Backend.TORCHSCRIPT:

@@ -32,6 +32,26 @@ logger = get_root_logger()
 
 @BACKEND_WRAPPER.register_module(Backend.CANN.value)
 class CANNWrapper(BaseWrapper):
+    """CANN wrapper class for inference.
+
+    Args:
+        model (str): Path to the cann model.
+        bin_file (str): Path of a binary file.
+        output_names (Sequence[str] | None): Names of model outputs in order.
+            Defaults to `None` and the wrapper will load the output names from
+            ncnn model.
+        device (str): The device name.
+
+    Examples:
+        >>> from mmdeploy.backend.ncnn import NCNNWrapper
+        >>> import torch
+        >>>
+        >>> model = 'model.om'
+        >>> model = CANNWrapper(model)
+        >>> inputs = dict(input=torch.randn(1, 3, 224, 224).to('npu'))
+        >>> outputs = model(inputs)
+        >>> print(outputs)
+    """
 
     def __init__(self,
                  model: str,

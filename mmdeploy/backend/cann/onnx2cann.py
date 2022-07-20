@@ -71,7 +71,7 @@ def from_onnx(onnx_model: Union[str, onnx.ModelProto],
     if dynamic_hw is not None:
         dynamic_hw_str = ';'.join(
             [','.join([str(i) for i in hw]) for hw in dynamic_hw])
-        cann_args += f'--dynamic_hw_size "{dynamic_hw_str}" '
+        cann_args += f'--dynamic_image_size "{dynamic_hw_str}" '
 
     if extra_options is not None:
         cann_args += extra_options
