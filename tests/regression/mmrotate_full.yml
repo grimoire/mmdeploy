@@ -1,0 +1,120 @@
+globals:
+  codebase_dir: ../mmrotate
+  checkpoint_force_download: False
+  images:
+    img_demo: &img_demo ../mmrotate/demo/demo.jpg
+    img_dota_demo: &img_dota_demo ../mmrotate/demo/dota_demo.jpg
+    img_dior_demo: &img_dior_demo ../mmrotate/tests/data/dior/JPEGImage/00001.jpg
+    img_hrsc_demo: &img_hrsc_demo ../mmrotate/tests/data/dota/images/P2805__1024__0___0.png
+  metric_info: &metric_info
+    mAP: # named after metafile.Results.Metrics
+      metric_key: AP # eval key name
+      tolerance: 0.10 # metric ±n%
+  convert_image_dota: &convert_image_dota
+    input_img: *img_demo
+    test_img: *img_dota_demo
+  convert_image_dior: &convert_image_dior
+    input_img: *img_demo
+    test_img: *img_dior_demo
+  convert_image_hrsc: &convert_image_hrsc
+    input_img: *img_demo
+    test_img: *img_hrsc_demo
+  backend_test: &default_backend_test False
+
+onnxruntime:
+  # ======= detection =======
+  pipeline_ort_detection_static_fp32: &pipeline_ort_detection_static_fp32
+    convert_image: *convert_image_dota
+    backend_test: False
+    deploy_config: configs/mmrotate/rotated-detection_onnxruntime_static.py
+
+  pipeline_ort_detection_dynamic_fp32: &pipeline_ort_detection_dynamic_fp32
+    convert_image: *convert_image_dota
+    deploy_config: configs/mmrotate/rotated-detection_onnxruntime_dynamic.py
+
+tensorrt:
+  # ======= dota =======
+  pipeline_trt_dota_dynamic_fp32: &pipeline_trt_dota_dynamic_fp32
+    convert_image: *convert_image_dota
+    backend_test: *default_backend_test
+    deploy_config: configs/mmrotate/rotated-detection_tensorrt_dynamic-320x320-1024x1024.py
+
+  pipeline_trt_dota_dynamic_fp16: &pipeline_trt_dota_dynamic_fp16
+    convert_image: *convert_image_dota
+    backend_test: *default_backend_test
+    deploy_config: configs/mmrotate/rotated-detection_tensorrt-fp16_dynamic-320x320-1024x1024.py
+
+  # ======= hrsc =======
+  pipeline_trt_hrsc_dynamic_fp32: &pipeline_trt_hrsc_dynamic_fp32
+    convert_image: *convert_image_hrsc
+    backend_test: *default_backend_test
+    deploy_config: configs/mmrotate/rotated-detection_tensorrt_dynamic-320x320-800x512.py
+
+  pipeline_trt_hrsc_dynamic_fp16: &pipeline_trt_hrsc_dynamic_fp16
+    convert_image: *convert_image_hrsc
+    backend_test: *default_backend_test
+    deploy_config: configs/mmrotate/rotated-detection_tensorrt-fp16_dynamic-320x320-800x512.py
+
+  # ======= dior =======
+  pipeline_trt_dior_dynamic_fp32: &pipeline_trt_dior_dynamic_fp32
+    convert_image: *convert_image_dior
+    backend_test: *default_backend_test
+    deploy_config: configs/mmrotate/rotated-detection_tensorrt_dynamic-320x320-800x512.py
+
+  pipeline_trt_dior_dynamic_fp16: &pipeline_trt_dior_dynamic_fp16
+    convert_image: *convert_image_dior
+    backend_test: *default_backend_test
+    deploy_config: configs/mmrotate/rotated-detection_tensorrt-fp16_dynamic-320x320-800x512.py
+
+models:
+  # - metafile: configs/rotated_retinanet/metafile.yml
+  #   model_configs:
+  #     - configs/rotated_retinanet/rotated-retinanet-hbox-oc_r50_fpn_1x_dota.py
+  #     - configs/rotated_retinanet/rotated-retinanet-rbox-le90_r50_fpn_rr-1x_dota-ms.py
+  #     - configs/rotated_retinanet/rotated-retinanet-rbox-le135_r50_fpn_1x_dota.py
+  #   name: rotated_retinanet_dota
+  #   pipelines:
+  #     - *pipeline_ort_detection_dynamic_fp32
+  #     - *pipeline_trt_dota_dynamic_fp32
+  #     - *pipeline_trt_dota_dynamic_fp16
+  # - metafile: configs/rotated_retinanet/metafile.yml
+  #   model_configs:
+  #     - configs/rotated_retinanet/rotated-retinanet-hbox-oc_r50_fpn_rr-6x_hrsc.py
+  #     - configs/rotated_retinanet/rotated-retinanet-rbox-le90_r50_fpn_rr-6x_hrsc.py
+  #   name: rotated_retinanet_hrsc
+  #   pipelines:
+  #     - *pipeline_ort_detection_dynamic_fp32
+  #     - *pipeline_trt_hrsc_dynamic_fp32
+  #     - *pipeline_trt_hrsc_dynamic_fp16
+  # - metafile: configs/rotated_retinanet/metafile.yml
+  #   model_configs:
+  #     - configs/rotated_retinanet/rotated-retinanet-rbox-oc_r50_fpn_1x_dior.py
+  #     - configs/rotated_retinanet/rotated-retinanet-rbox-le90_r50_fpn_1x_dior.py
+  #   name: rotated_retinanet_dior
+  #   pipelines:
+  #     - *pipeline_ort_detection_dynamic_fp32
+  #     - *pipeline_trt_dior_dynamic_fp32
+  #     - *pipeline_trt_dior_dynamic_fp16
+  - metafile: configs/oriented_rcnn/metafile.yml
+    model_configs:
+      - configs/oriented_rcnn/oriented-rcnn-le90_r50_fpn_1x_dota.py
+    name: oriented_rcnn
+    pipelines:
+      - *pipeline_ort_detection_dynamic_fp32
+      - *pipeline_trt_dota_dynamic_fp32
+      - *pipeline_trt_dota_dynamic_fp16
+  - metafile: configs/gliding_vertex/metafile.yml
+    model_configs:
+      - configs/gliding_vertex/gliding-vertex-rbox_r50_fpn_1x_dota.py
+    name: gliding_vertex
+    pipelines:
+      - *pipeline_trt_dota_dynamic_fp32
+      - *pipeline_trt_dota_dynamic_fp16
+  - metafile: configs/roi_trans/metafile.yml
+    model_configs:
+      - configs/roi_trans/roi-trans-le90_r50_fpn_1x_dota-ms.py
+    # - configs/roi_trans/roi-trans-le90_swin-tiny_fpn_1x_dota.py
+    name: roi_trans
+    pipelines:
+      - *pipeline_trt_dota_dynamic_fp32
+      - *pipeline_trt_dota_dynamic_fp16
