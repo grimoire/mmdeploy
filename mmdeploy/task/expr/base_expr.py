@@ -254,24 +254,21 @@ class BaseExpr:
         raise NotImplementedError(
             f'forward has not been implemented for expr {type(self)}.')
 
-    # def _slow_forward(self, *args: Any, **kwargs: Any) -> Any:
-    #     from .trace import TraceContext
-    #     trace_context = TraceContext.current_context()
-    #     if trace_context is not None:
-    #         with trace_context.scope(self):
-    #             if self.atomic() and trace_context.enable:
-    #                 with trace_context.disabler():
-    #                     outputs = self.forward(*args, **kwargs)
-    #                 kw_inputs, _ = self._generate_io_named_map(
-    #                     args, kwargs, outputs)
-    #                 trace_context.add_expr(self, [], kw_inputs, outputs)
-    #             else:
-    #                 outputs = self.forward(*args, **kwargs)
-    #                 self._parse_io_names(args, kwargs, outputs)
-    #     else:
-    #         outputs = self.forward(*args, **kwargs)
-    #         self._parse_io_names(args, kwargs, outputs)
-    #     return outputs
+    def _trace_forward(self, *args: Any, **kwargs: Any) -> Any:
+        """forward function called when trace graph."""
+        from .trace import TraceContext
+        trace_context = TraceContext.current_context()
+        with trace_context.scope(self):
+            if self.atomic() and trace_context.enable:
+                with trace_context.disabler():
+                    outputs = self.forward(*args, **kwargs)
+                kw_inputs, _ = self._generate_io_named_map(
+                    args, kwargs, outputs)
+                trace_context.add_expr(self, [], kw_inputs, outputs)
+            else:
+                outputs = self.forward(*args, **kwargs)
+                self._parse_io_names(args, kwargs, outputs)
+        return outputs
 
     def _call_impl(self, *args, **kwargs):
         """call implementation."""
@@ -287,11 +284,10 @@ class BaseExpr:
             if hook_results is not None:
                 args, kwargs = hook_results
 
-        # from .trace import TraceContext
-        # trace_context = TraceContext.current_context()
-        # forward_call = self._slow_forward if trace_context is not None \
-        #     else self.forward
-        forward_call = self.forward
+        from .trace import TraceContext
+        trace_context = TraceContext.current_context()
+        forward_call = self._trace_forward if trace_context is not None \
+            else self.forward
         results = forward_call(*args, **kwargs)
         self._parse_io_names(args, kwargs, results)
 
